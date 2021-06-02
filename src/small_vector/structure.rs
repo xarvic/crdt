@@ -9,15 +9,19 @@ pub(in crate::small_vector) struct Span {
 
 /// A simple collection trait for small_vector.
 ///
-pub trait CrdtCollection<T: Clone> {
+pub trait CrdtCollection {
+    type Element: Clone;
+
     fn new() -> Self;
     fn length(&self) -> usize;
-    fn get(&self, index: usize) -> T;
-    fn insert(&mut self, index: usize, value: T);
+    fn get(&self, index: usize) -> Self::Element;
+    fn insert(&mut self, index: usize, value: Self::Element);
     fn remove(&mut self, index: usize);
 }
 
-impl<T: Clone> CrdtCollection<T> for im::Vector<T> {
+impl<T: Clone> CrdtCollection for im::Vector<T> {
+    type Element = T;
+
     fn new() -> Self {
         Self::new()
     }
@@ -39,7 +43,9 @@ impl<T: Clone> CrdtCollection<T> for im::Vector<T> {
     }
 }
 
-impl CrdtCollection<char> for ropey::Rope {
+impl CrdtCollection for ropey::Rope {
+    type Element = char;
+
     fn new() -> Self {
         Self::new()
     }

@@ -4,15 +4,14 @@ use std::iter::Iterator;
 use crate::small_vector::structure::{Span, CrdtCollection};
 
 #[derive(Clone)]
-pub struct Vector<T, V> {
+pub struct Vector<V> {
     next_local_id: u64,
     local_author: u16,
     spans: im::Vector<Span>,
     document: V,
-    phantom: PhantomData<T>,
 }
 
-impl<T: Clone, V> Vector<T, V> where V: CrdtCollection<T> {
+impl<V: CrdtCollection> Vector<V> {
     pub fn new(local_author: u16) -> Self {
         Self::with_data(V::new(), local_author)
     }
@@ -33,7 +32,6 @@ impl<T: Clone, V> Vector<T, V> where V: CrdtCollection<T> {
             local_author,
             spans,
             document: data,
-            phantom: PhantomData,
         }
     }
 
@@ -71,8 +69,8 @@ pub enum VectorUpdate<T> {
     },
 }
 
-impl<T: Clone, V> CvRDT for Vector<T, V> where V: CrdtCollection<T> {
-    type Update = VectorUpdate<T>;
+impl<V: CrdtCollection> CvRDT for Vector<V> {
+    type Update = VectorUpdate<V::Element>;
 
     fn update(&mut self, update: Self::Update) {
 
