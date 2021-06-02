@@ -48,7 +48,7 @@ impl<V: CrdtCollection> SmallVectorImpl<V> {
 
     #[inline(always)]
     pub fn position(&self, index: usize) -> LocalId {
-        let index = index as u32;
+        let index = index as u32 + 1;
         let (span_id, &span) = self.spans.iter()
             .enumerate()
             .find(|span|!span.1.deleted && span.1.document_index <= index && span.1.document_index + span.1.length > index)
@@ -76,69 +76,64 @@ impl<V: CrdtCollection> SmallVectorImpl<V> {
     }
 
     #[inline(always)]
-    pub fn insert(&mut self, previous: LocalId, id: StableId, value: V::Element) {
-        let mut next_span = previous.span_index + 1;
-        if previous.span.deleted {
-            // The span is already deleted: It has no character in the document
+    pub fn insert(&mut self, previous: LocalId, current: StableId, element: V::Element) {
+        let mut span_id = previous.span_index;
+        let span = previous.span;
+        let previous_id = previous.span.start_id + previous.offset;
 
-            // Insert a new span after it
+        if span.deleted {
+            // The span is already deleted: It has no character in the document
             self.spans.insert(
-                previous.span_index + 1,
+                span_id + 1,
                 Span {
-                    document_index: previous.span.document_index,
+                    document_index: span.document_index,
                     length: 1,
-                    start_id: id.id,
-                    author: id.author,
+                    start_id: current.id,
+                    author: current.author,
                     deleted: false,
                 },
             );
-
-            // Insert the characrter where the previous span started
-            self.document.insert(previous.span.document_index as usize - 1, value);
-
-            next_span += 1;
+            self.document
+                .insert(span.document_index as usize - 1, element);
         } else {
+            let document_index = previous_id - span.start_id + span.document_index + 1;
+            self.document.insert(document_index as usize - 1, element);
 
-            // The span is not deleted, therefore we insert the character after the position of
-            // previous id.
-            let document_index = previous.position() + 1;
-            self.document.insert(document_index- 1, value);
-
-            if previous.span_end_id() == id.id
-                && previous.id() + 1 == id.id
-                && previous.span.author == id.author
+            if span.start_id + span.length == current.id
+                && previous_id + 1 == current.id
+                && span.author == current.author
             {
                 // We are behind the last item of this span and are the same author: Extend the span
                 // This is the case we optimise for, since most of the time typing happens continuously.
-                self.spans[previous.span_index()].length += 1;
+                self.spans[span_id].length += 1;
             } else {
-
                 // We are inside the span of another author or jumped back, therefore we need to
                 // create a new span and split the span if necessary.
-                let new_length = previous.offset + 1;
+
+                let new_length = previous_id - span.start_id + 1;
 
                 // Insert the new span after the old span
                 // span_id
                 self.spans.insert(
-                    previous.span_index + 1,
+                    span_id + 1,
                     Span {
-                        document_index: document_index as u32,
+                        document_index,
                         length: 1,
-                        start_id: id.id,
-                        author: id.author,
+                        start_id: current.id,
+                        author: current.author,
                         deleted: false,
                     },
                 );
 
-                if new_length < previous.span.length {
+                if new_length < span.length {
                     // Split off the rest:
                     self.spans.insert(
-                        previous.span_index + 2,
+                        span_id + 2,
                         Span {
-                            document_index: document_index as u32 + 1,    // Insert after the current character
-                            length: previous.span.length - new_length,    // The remaining length
-                            start_id: previous.span_start_id() + new_length, // The id after the last id inside the old span
-                            author: previous.span.author,
+                            document_index: document_index + 1, // Insert after the current character
+                            length: span.length - new_length,   // The remaining length
+                            start_id: span.start_id + new_length, // The id after the last id inside the old span
+                            author: span.author,
                             deleted: false,
                         },
                     );
@@ -146,16 +141,16 @@ impl<V: CrdtCollection> SmallVectorImpl<V> {
                     // Reduce the length
                     // new length will always be <= span.length therefore this is the only case
                     // in which we need to change something
-                    self.spans[previous.span_index].length = new_length;
+                    self.spans[span_id].length = new_length;
 
-                    next_span += 1;
+                    span_id += 1;
                 }
 
-                next_span += 1;
+                span_id += 1;
             }
         }
 
-        for span in self.spans.iter_mut().skip(next_span) {
+        for span in self.spans.iter_mut().skip(span_id + 1) {
             // advance each following span.
             span.document_index += 1;
         }
@@ -164,22 +159,27 @@ impl<V: CrdtCollection> SmallVectorImpl<V> {
 
     #[inline(always)]
     pub fn delete(&mut self, local_id: LocalId) {
-        let mut next_span = local_id.span_index() + 1;
+        let span_index = local_id.span_index;
+        let span = local_id.span;
+        let mut next_span = span_index + 1;
+        let id = local_id.span.start_id + local_id.offset;
+        let author = local_id.span.author;
 
         // Otherwise someone else already deleted this id.
-        if !local_id.span.deleted {
+        if !span.deleted {
             self.document
-                .remove(local_id.position() as usize - 1);
+                .remove((id - span.start_id + span.document_index) as usize - 1);
 
-            let mut new_length = local_id.span_length() - 1;
+            let mut new_length = span.length - 1;
 
-            let other = if self.spans.len() > local_id.span_index() + 1 {
-                let next_span = &mut self.spans[local_id.span_index() + 1];
+            let other = if self.spans.len() > span_index + 1 {
+                let next_span = &mut self.spans[span_index + 1];
 
-                if next_span.start_id == local_id.id() + 1
-                    && next_span.author == local_id.author()
+                if next_span.start_id == id + 1
+                    && next_span.author == author
                     && next_span.deleted
-                    && local_id.span_length() == local_id.offset() + 1
+                    && span.start_id + span.length == id + 1
+                    && span.author == author
                 {
                     // prepend
                     next_span.document_index -= 1;
@@ -194,29 +194,29 @@ impl<V: CrdtCollection> SmallVectorImpl<V> {
             };
 
             if other {
-                new_length = local_id.offset;
+                new_length = id - span.start_id;
 
                 // The span with the newly deleted item
                 self.spans.insert(
-                    local_id.span_index() + 1,
+                    span_index + 1,
                     Span {
-                        document_index: local_id.span_start_id() + new_length,
+                        document_index: span.document_index + new_length,
                         length: 1,
-                        start_id: local_id.id(),
-                        author: local_id.author(),
+                        start_id: id,
+                        author,
                         deleted: true,
                     },
                 );
 
-                if new_length < local_id.span.length - 1 {
+                if new_length < span.length - 1 {
                     // The additional items of the original span behind the deleted item
                     self.spans.insert(
-                        local_id.span_index() + 2,
+                        span_index + 2,
                         Span {
-                            document_index: local_id.span_start_position() + new_length,
-                            length: local_id.span_length() - new_length - 1,
-                            start_id: local_id.id() + 1,
-                            author: local_id.author(),
+                            document_index: span.document_index + new_length,
+                            length: span.length - new_length - 1,
+                            start_id: id + 1,
+                            author,
                             deleted: false,
                         },
                     );
@@ -233,22 +233,22 @@ impl<V: CrdtCollection> SmallVectorImpl<V> {
 
             if new_length == 0 {
                 // The span we are inside of has only one character: remove the span!
-                self.spans.remove(local_id.span_index());
+                self.spans.remove(span_index);
 
                 // Merge if possible
-                let next_span = self.spans[local_id.span_index()];
+                let next_span = self.spans[span_index];
 
                 // Since we have a dummy item at position 0 span_id will never be 0
-                let previous = &mut self.spans[local_id.span_index() - 1];
+                let previous = &mut self.spans[span_index - 1];
 
                 if previous.start_id + previous.length == next_span.start_id
                     && previous.author == next_span.author
                 {
                     previous.length += next_span.length;
-                    self.spans.remove(local_id.span_index());
+                    self.spans.remove(span_index);
                 }
             } else {
-                let span_ref = &mut self.spans[local_id.span_index()];
+                let span_ref = &mut self.spans[span_index];
                 span_ref.length = new_length;
             }
         }
@@ -295,46 +295,14 @@ impl LocalId {
     #[inline(always)]
     pub fn position(self) -> usize {
         if !self.span.deleted {
-            (self.span.document_index + self.offset) as usize
+            (self.span.document_index + self.offset) as usize + 1
         } else {
-            0
+            self.span.document_index as usize + 1
         }
     }
 
     pub fn author(self) -> u16 {
         self.span.author
-    }
-
-    pub fn span_length(self) -> u32 {
-        self.span.length
-    }
-
-    #[inline(always)]
-    pub fn span_start_id(self) -> u32 {
-        self.span.start_id
-    }
-
-    #[inline(always)]
-    pub fn span_end_id(self) -> u32 {
-        self.span.start_id + self.span.length
-    }
-
-    #[inline(always)]
-    pub fn span_start_position(self) -> u32 {
-        self.span.document_index
-    }
-
-    #[inline(always)]
-    pub fn span_end_position(self) -> u32 {
-        self.span.document_index + self.span.length
-    }
-
-    pub fn span_index(self) -> usize {
-        self.span_index
-    }
-
-    pub fn offset(self) -> u32 {
-        self.offset
     }
 }
 

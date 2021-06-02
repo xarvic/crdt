@@ -30,16 +30,10 @@ impl<V: CrdtCollection + Debug> SmallVector<V> {
     }
 
     pub fn insert(&mut self, index: usize, element: V::Element) -> VectorUpdate<V::Element> {
-        println!("\n---------------");
-        dbg!(index);
-        let previous = self.inner.position(index);
-        dbg!(previous);
+        let previous = self.inner.position(index - 1);
         let current = StableId::new(self.inner.author(), self.inner.next_local_id());
 
         self.inner.insert(previous, current, element.clone());
-
-        dbg!(self.inner.document());
-        self.inner.dbg_spans();
 
         VectorUpdate::Insert {
             previous: previous.stable(),
@@ -50,9 +44,8 @@ impl<V: CrdtCollection + Debug> SmallVector<V> {
 
     pub fn delete(&mut self, index: usize) -> VectorUpdate<V::Element> {
         let position = self.inner.position(index);
-
         self.inner.delete(position);
-        
+
         VectorUpdate::Delete {
             id: position.stable(),
         }
@@ -75,17 +68,12 @@ impl<V: CrdtCollection + Debug> CvRDT for SmallVector<V> {
     fn update(&mut self, update: Self::Update) {
         match update {
             VectorUpdate::Insert { previous, current, element } => {
-                println!("\n---------------");
-                dbg!(previous);
-                let Local_previous = self.inner.stable_position(previous);
-                dbg!(Local_previous);
-                self.inner.insert(Local_previous, current, element);
-                dbg!(self.inner.document());
-                self.inner.dbg_spans();
+                let local_previous = self.inner.stable_position(previous);
+                self.inner.insert(local_previous, current, element);
             }
             VectorUpdate::Delete { id } => {
-                let id = self.inner.stable_position(id);
-                self.inner.delete(id);
+                let local_id = self.inner.stable_position(id);
+                self.inner.delete(local_id);
             }
         }
     }
