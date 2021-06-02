@@ -1,4 +1,4 @@
-use crate::cvrdt::{VectorUpdate, CrdtBox, SmallVector};
+use crate::cvrdt::{CrdtBox, SmallVector};
 use crate::util::CrdtCollection;
 
 use std::fmt::Debug;
@@ -10,29 +10,10 @@ fn simple_insert() {
         Vector::from(&[0, 1, 2, 3, 4, 5, 6, 7, 8, 9][..]),
         Vector::from(&[0, 1, 2, 3, 35, 4, 5, 55, 56, 6, 7, 8, 9][..]),
         |a, b| {
-            a.update(VectorUpdate::Insert {
-                previous_author: 0,
-                previous_id: 4,
-                this_author: 1,
-                this_id: 1,
-                element: 35,
-            });
+            a.insert(4, 35);
 
-            b.update(VectorUpdate::Insert {
-                previous_author: 0,
-                previous_id: 6,
-                this_author: 2,
-                this_id: 1,
-                element: 55,
-            });
-
-            b.update(VectorUpdate::Insert {
-                previous_author: 2,
-                previous_id: 1,
-                this_author: 2,
-                this_id: 2,
-                element: 56,
-            });
+            b.insert(6, 55);
+            b.insert(7, 56);
         },
     );
 }
@@ -43,11 +24,10 @@ fn simple_delete() {
         Vector::from(&[0, 1, 2, 3, 4, 5, 6, 7, 8, 9][..]),
         Vector::from(&[0, 1, 2, 4, 7, 8, 9][..]),
         |a, b| {
-            a.update(VectorUpdate::Delete { author: 0, id: 4 });
+            a.delete(3);
 
-            b.update(VectorUpdate::Delete { author: 0, id: 6 });
-
-            b.update(VectorUpdate::Delete { author: 0, id: 7 });
+            b.delete(5);
+            b.delete(5);
         },
     );
 }
