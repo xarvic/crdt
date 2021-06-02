@@ -1,16 +1,16 @@
-use crate::small_vector::structure::{CrdtCollection, Span};
-use crate::CvRDT;
 use std::iter::Iterator;
+use crate::util::CrdtCollection;
+use crate::cvrdt::CvRDT;
 
 #[derive(Clone)]
-pub struct Vector<V> {
+pub struct SmallVector<V> {
     next_local_id: u64,
     local_author: u16,
     spans: im::Vector<Span>,
     document: V,
 }
 
-impl<V: CrdtCollection> Vector<V> {
+impl<V: CrdtCollection> SmallVector<V> {
     pub fn new(local_author: u16) -> Self {
         Self::with_data(V::new(), local_author)
     }
@@ -72,7 +72,7 @@ pub enum VectorUpdate<T> {
     },
 }
 
-impl<V: CrdtCollection> CvRDT for Vector<V> {
+impl<V: CrdtCollection> CvRDT for SmallVector<V> {
     type Update = VectorUpdate<V::Element>;
 
     fn update(&mut self, update: Self::Update) {
@@ -255,4 +255,13 @@ impl<V: CrdtCollection> CvRDT for Vector<V> {
             }
         }
     }
+}
+
+#[derive(Copy, Clone, Debug)]
+pub(crate) struct Span {
+    pub document_index: u32,
+    pub length: u32,
+    pub start_id: u32,
+    pub author: u16,
+    pub deleted: bool,
 }

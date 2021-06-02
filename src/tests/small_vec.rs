@@ -1,5 +1,6 @@
-use crate::small_vector::{CrdtCollection, CvrdtVector, VectorUpdate};
-use crate::CrdtBox;
+use crate::cvrdt::{VectorUpdate, CrdtBox, SmallVector};
+use crate::util::CrdtCollection;
+
 use std::fmt::Debug;
 use im::Vector;
 
@@ -54,10 +55,10 @@ fn simple_delete() {
 fn test_small_vec<V: CrdtCollection + PartialEq + Clone + Debug>(
     initial: V,
     expected: V,
-    change: impl Fn(&mut CrdtBox<CvrdtVector<V>>, &mut CrdtBox<CvrdtVector<V>>),
+    change: impl Fn(&mut CrdtBox<SmallVector<V>>, &mut CrdtBox<SmallVector<V>>),
 ) {
-    let mut crdt_a = CrdtBox::new(CvrdtVector::with_data(initial.clone(), 1));
-    let mut crdt_b = CrdtBox::new(CvrdtVector::with_data(initial.clone(), 2));
+    let mut crdt_a = CrdtBox::new(SmallVector::with_data(initial.clone(), 1));
+    let mut crdt_b = CrdtBox::new(SmallVector::with_data(initial.clone(), 2));
 
     change(&mut crdt_a, &mut crdt_b);
 

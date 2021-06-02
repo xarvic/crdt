@@ -1,14 +1,19 @@
+//TODO: remove this
 #![allow(dead_code)]
 //!
 //!
 //!
 //!
 
+// The modules which contain the public types
+pub mod cvrdt;
+pub mod cmrdt;
+
+// The module which contains the common data structures.
 mod crdt;
-mod crdt_box;
-mod small_vector;
+
+// The module which contains basic structures needed by the CRDTs.
+pub mod util;
+
 #[cfg(test)]
 mod tests;
-
-pub use crdt::{CmRDT, CvRDT};
-pub use crdt_box::CrdtBox;

@@ -1,12 +1,3 @@
-#[derive(Copy, Clone, Debug)]
-pub(in crate::small_vector) struct Span {
-    pub document_index: u32,
-    pub length: u32,
-    pub start_id: u32,
-    pub author: u16,
-    pub deleted: bool,
-}
-
 /// A simple collection trait for small_vector.
 ///
 pub trait CrdtCollection {

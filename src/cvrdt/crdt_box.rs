@@ -1,7 +1,6 @@
-use crate::CvRDT;
-use im::Vector;
 use std::mem::replace;
 use std::ops::Deref;
+use crate::cvrdt::CvRDT;
 
 #[derive(Clone)]
 pub struct CrdtBox<T: CvRDT> {
@@ -23,7 +22,7 @@ impl<T: CvRDT> CrdtBox<T> {
     }
 
     pub(crate) fn drain_update(&mut self) -> im::Vector<T::Update> {
-        replace(&mut self.update, Vector::new())
+        replace(&mut self.update, im::Vector::new())
     }
 }
 
