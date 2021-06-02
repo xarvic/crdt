@@ -3,9 +3,9 @@
 //!
 //!
 
-mod structure;
-mod cvrdt;
 mod cmrdt;
+mod cvrdt;
+mod structure;
 
 pub use cvrdt::{Vector as CvrdtVector, VectorUpdate};
 pub use structure::CrdtCollection;

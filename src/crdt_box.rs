@@ -1,7 +1,7 @@
 use crate::CvRDT;
-use std::ops::Deref;
-use std::mem::replace;
 use im::Vector;
+use std::mem::replace;
+use std::ops::Deref;
 
 #[derive(Clone)]
 pub struct CrdtBox<T: CvRDT> {

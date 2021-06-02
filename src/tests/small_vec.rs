@@ -1,14 +1,14 @@
-use crate::small_vector::{CvrdtVector, VectorUpdate, CrdtCollection};
-use im::Vector;
+use crate::small_vector::{CrdtCollection, CvrdtVector, VectorUpdate};
 use crate::CrdtBox;
 use std::fmt::Debug;
+use im::Vector;
 
 #[test]
 fn simple_insert() {
     test_small_vec(
         Vector::from(&[0, 1, 2, 3, 4, 5, 6, 7, 8, 9][..]),
         Vector::from(&[0, 1, 2, 3, 35, 4, 5, 55, 56, 6, 7, 8, 9][..]),
-        |a, b|{
+        |a, b| {
             a.update(VectorUpdate::Insert {
                 previous_author: 0,
                 previous_id: 4,
@@ -32,7 +32,7 @@ fn simple_insert() {
                 this_id: 2,
                 element: 56,
             });
-        }
+        },
     );
 }
 
@@ -41,29 +41,20 @@ fn simple_delete() {
     test_small_vec(
         Vector::from(&[0, 1, 2, 3, 4, 5, 6, 7, 8, 9][..]),
         Vector::from(&[0, 1, 2, 4, 7, 8, 9][..]),
-        |a, b|{
-            a.update(VectorUpdate::Delete {
-                author: 0,
-                id: 4,
-            });
+        |a, b| {
+            a.update(VectorUpdate::Delete { author: 0, id: 4 });
 
-            b.update(VectorUpdate::Delete {
-                author: 0,
-                id: 6,
-            });
+            b.update(VectorUpdate::Delete { author: 0, id: 6 });
 
-            b.update(VectorUpdate::Delete {
-                author: 0,
-                id: 7,
-            });
-        }
+            b.update(VectorUpdate::Delete { author: 0, id: 7 });
+        },
     );
 }
 
 fn test_small_vec<V: CrdtCollection + PartialEq + Clone + Debug>(
     initial: V,
     expected: V,
-    change: impl Fn(&mut CrdtBox<CvrdtVector<V>>, &mut CrdtBox<CvrdtVector<V>>)
+    change: impl Fn(&mut CrdtBox<CvrdtVector<V>>, &mut CrdtBox<CvrdtVector<V>>),
 ) {
     let mut crdt_a = CrdtBox::new(CvrdtVector::with_data(initial.clone(), 1));
     let mut crdt_b = CrdtBox::new(CvrdtVector::with_data(initial.clone(), 2));
@@ -80,7 +71,12 @@ fn test_small_vec<V: CrdtCollection + PartialEq + Clone + Debug>(
         crdt_a.update(update);
     }
 
-    assert_eq!(crdt_a.document(), crdt_b.document(), "the CRDTs don't converge from {:?}", initial);
+    assert_eq!(
+        crdt_a.document(),
+        crdt_b.document(),
+        "the CRDTs don't converge from {:?}",
+        initial
+    );
     assert!(
         crdt_a.document() == &expected,
         "the converged CRDTs don't have the expected value:\nExpected: {:?}\n Actual: {:?}\n",

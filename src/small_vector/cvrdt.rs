@@ -1,7 +1,6 @@
+use crate::small_vector::structure::{CrdtCollection, Span};
 use crate::CvRDT;
-use std::marker::PhantomData;
 use std::iter::Iterator;
-use crate::small_vector::structure::{Span, CrdtCollection};
 
 #[derive(Clone)]
 pub struct Vector<V> {
@@ -20,13 +19,16 @@ impl<V: CrdtCollection> Vector<V> {
         let mut spans = im::Vector::new();
         // Insert a dummy span since we insert always after another element, this is the only
         // possible way to insert at the first position.
-        spans.insert(0, Span {
-            document_index: 0,
-            length: data.length() as u32 + 1,
-            start_id: 0,
-            author: 0,
-            deleted: false,
-        });
+        spans.insert(
+            0,
+            Span {
+                document_index: 0,
+                length: data.length() as u32 + 1,
+                start_id: 0,
+                author: 0,
+                deleted: false,
+            },
+        );
         Self {
             next_local_id: 0,
             local_author,
@@ -36,11 +38,12 @@ impl<V: CrdtCollection> Vector<V> {
     }
 
     pub(crate) fn span_index(&self, author: u16, id: u32) -> usize {
-        self.spans.iter().position(|span|{
-            span.author == author &&
-                span.start_id <= id &&
-                span.start_id + span.length > id
-        } ).expect("cant find span!")
+        self.spans
+            .iter()
+            .position(|span| {
+                span.author == author && span.start_id <= id && span.start_id + span.length > id
+            })
+            .expect("cant find span!")
     }
 
     /// returns the underlying document. Since this CRDT does not keep a history, document contains
@@ -73,7 +76,6 @@ impl<V: CrdtCollection> CvRDT for Vector<V> {
     type Update = VectorUpdate<V::Element>;
 
     fn update(&mut self, update: Self::Update) {
-
         match update {
             VectorUpdate::Insert {
                 previous_author,
@@ -86,19 +88,26 @@ impl<V: CrdtCollection> CvRDT for Vector<V> {
                 let span = self.spans[span_id];
                 if span.deleted {
                     // The span is already deleted: It has no character in the document
-                    self.spans.insert(span_id + 1, Span {
-                        document_index: span.document_index,
-                        length: 1,
-                        start_id: this_id,
-                        author: this_author,
-                        deleted: false
-                    });
-                    self.document.insert(span.document_index as usize - 1, element);
+                    self.spans.insert(
+                        span_id + 1,
+                        Span {
+                            document_index: span.document_index,
+                            length: 1,
+                            start_id: this_id,
+                            author: this_author,
+                            deleted: false,
+                        },
+                    );
+                    self.document
+                        .insert(span.document_index as usize - 1, element);
                 } else {
                     let document_index = previous_id - span.start_id + span.document_index + 1;
                     self.document.insert(document_index as usize - 1, element);
 
-                    if span.start_id + span.length == this_id && previous_id + 1 == this_id && span.author == this_author {
+                    if span.start_id + span.length == this_id
+                        && previous_id + 1 == this_id
+                        && span.author == this_author
+                    {
                         // We are behind the last item of this span and are the same author: Extend the span
                         // This is the case we optimise for, since most of the time typing happens continuously.
                         self.spans[span_id].length += 1;
@@ -110,24 +119,29 @@ impl<V: CrdtCollection> CvRDT for Vector<V> {
 
                         // Insert the new span after the old span
                         // span_id
-                        self.spans.insert(span_id + 1, Span {
-                            document_index,
-                            length: 1,
-                            start_id: this_id,
-                            author: this_author,
-                            deleted: false,
-                        });
-
+                        self.spans.insert(
+                            span_id + 1,
+                            Span {
+                                document_index,
+                                length: 1,
+                                start_id: this_id,
+                                author: this_author,
+                                deleted: false,
+                            },
+                        );
 
                         if new_length < span.length {
                             // Split off the rest:
-                            self.spans.insert(span_id + 2, Span {
-                                document_index: document_index + 1,   // Insert after the current character
-                                length: span.length - new_length,     // The remaining length
-                                start_id: span.start_id + new_length, // The id after the last id inside the old span
-                                author: span.author,
-                                deleted: false,
-                            });
+                            self.spans.insert(
+                                span_id + 2,
+                                Span {
+                                    document_index: document_index + 1, // Insert after the current character
+                                    length: span.length - new_length,   // The remaining length
+                                    start_id: span.start_id + new_length, // The id after the last id inside the old span
+                                    author: span.author,
+                                    deleted: false,
+                                },
+                            );
 
                             // Reduce the length
                             // new length will always be <= span.length therefore this is the only case
@@ -146,59 +160,66 @@ impl<V: CrdtCollection> CvRDT for Vector<V> {
                     span.document_index += 1;
                 }
             }
-            VectorUpdate::Delete {
-                author,
-                id,
-            } => {
+            VectorUpdate::Delete { author, id } => {
                 let span_id = self.span_index(author, id);
                 let span = self.spans[span_id];
                 let mut shift_span = span_id + 1;
 
                 // Otherwise someone else already deleted this id.
                 if !span.deleted {
-                    self.document.remove((id - span.start_id + span.document_index) as usize - 1);
+                    self.document
+                        .remove((id - span.start_id + span.document_index) as usize - 1);
 
                     let mut new_length = span.length - 1;
 
                     let other = if self.spans.len() > span_id + 1 {
                         let next_span = &mut self.spans[span_id + 1];
 
-
-                        if next_span.start_id == id + 1 &&
-                            next_span.author == author &&
-                            next_span.deleted &&
-                            span.start_id + span.length == id + 1 &&
-                            span.author == author
+                        if next_span.start_id == id + 1
+                            && next_span.author == author
+                            && next_span.deleted
+                            && span.start_id + span.length == id + 1
+                            && span.author == author
                         {
                             // prepend
                             next_span.document_index -= 1;
                             next_span.start_id -= 1;
                             next_span.length += 1;
                             false
-                        } else { true }
-                    } else { true };
+                        } else {
+                            true
+                        }
+                    } else {
+                        true
+                    };
 
                     if other {
                         new_length = id - span.start_id;
 
                         // The span with the newly deleted item
-                        self.spans.insert(span_id + 1, Span {
-                            document_index: span.document_index + new_length,
-                            length: 1,
-                            start_id: id,
-                            author,
-                            deleted: true,
-                        });
+                        self.spans.insert(
+                            span_id + 1,
+                            Span {
+                                document_index: span.document_index + new_length,
+                                length: 1,
+                                start_id: id,
+                                author,
+                                deleted: true,
+                            },
+                        );
 
                         if new_length < span.length - 1 {
                             // The additional items of the original span behind the deleted item
-                            self.spans.insert(span_id + 2, Span {
-                                document_index: span.document_index + new_length,
-                                length: span.length - new_length - 1,
-                                start_id: id + 1,
-                                author,
-                                deleted: false,
-                            });
+                            self.spans.insert(
+                                span_id + 2,
+                                Span {
+                                    document_index: span.document_index + new_length,
+                                    length: span.length - new_length - 1,
+                                    start_id: id + 1,
+                                    author,
+                                    deleted: false,
+                                },
+                            );
 
                             shift_span += 1;
                         }
@@ -221,7 +242,8 @@ impl<V: CrdtCollection> CvRDT for Vector<V> {
                         let previous = &mut self.spans[span_id - 1];
 
                         if previous.start_id + previous.length == next_span.start_id
-                            && previous.author == next_span.author {
+                            && previous.author == next_span.author
+                        {
                             previous.length += next_span.length;
                             self.spans.remove(span_id);
                         }
